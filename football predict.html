@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Match Predictor</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; }
+    body { background: #060c18; font-family: 'DM Sans', sans-serif; min-height: 100vh; }
+    .grid-bg {
+      background-image:
+        linear-gradient(rgba(255,255,255,0.012) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.012) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+    .solid  { font-family: 'Bebas Neue', sans-serif; color: #fff; }
+    .outline { font-family: 'Bebas Neue', sans-serif; -webkit-text-stroke: 1.5px rgba(255,255,255,0.2); color: transparent; }
+    @keyframes ping    { 75%,100%{ transform:scale(2); opacity:0; } }
+    @keyframes slideUp { from{ opacity:0; transform:translateY(18px); } to{ opacity:1; transform:translateY(0); } }
+    @keyframes fillBar { from{ width:50%; } }
+    @keyframes pulse   { 0%,100%{ opacity:1; } 50%{ opacity:0.4; } }
+    .ping        { animation: ping 1.4s cubic-bezier(0,0,0.2,1) infinite; }
+    .card-enter  { animation: slideUp 0.45s ease forwards; opacity:0; }
+    .bar-fill    { animation: fillBar 0.9s cubic-bezier(0.34,1.56,0.64,1) forwards; }
+    .skeleton    { animation: pulse 1.6s ease-in-out infinite; }
+    .filter-btn  { padding:6px 16px; border-radius:9999px; font-size:11px; font-weight:700; letter-spacing:0.15em; text-transform:uppercase; border:1px solid rgba(255,255,255,0.07); background:rgba(255,255,255,0.04); color:#475569; cursor:pointer; transition:all 0.2s; }
+    .filter-btn.active { background:#fff; color:#060c18; border-color:#fff; }
+    .filter-btn:hover:not(.active) { background:rgba(255,255,255,0.08); color:#94a3b8; }
+    .refresh-btn { padding:6px 16px; border-radius:9999px; font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; border:1px solid rgba(34,197,94,0.25); background:rgba(34,197,94,0.08); color:#22c55e; cursor:pointer; margin-left:auto; transition:all 0.2s; }
+    .refresh-btn:hover { background:rgba(34,197,94,0.16); }
+    .match-card  { background:linear-gradient(160deg,#0c1626 0%,#101820 100%); border:1px solid rgba(255,255,255,0.055); border-radius:16px; overflow:hidden; box-shadow:0 4px 24px rgba(0,0,0,0.45); }
+    .stat-pill   { flex:1; display:flex; flex-direction:column; align-items:center; padding:10px 12px; border-radius:12px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.05); }
+  </style>
+</head>
+<body class="grid-bg">
+
+  <div class="relative max-w-2xl mx-auto px-4 py-10">
+
+    <!-- Header -->
+    <div style="margin-bottom:32px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+        <span style="position:relative;display:inline-flex;width:8px;height:8px;">
+          <span class="ping" style="position:absolute;inset:0;border-radius:9999px;background:#22c55e;opacity:0.75;"></span>
+          <span style="position:relative;width:8px;height:8px;border-radius:9999px;background:#22c55e;display:inline-flex;"></span>
+        </span>
+        <span style="font-size:11px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:#22c55e;">Today's Predictions</span>
+      </div>
+      <h1 style="line-height:1;margin:0;">
+        <span class="solid"   style="font-size:56px;display:block;">Match</span>
+        <span class="outline" style="font-size:56px;display:block;">Predictor</span>
+      </h1>
+      <p id="today-date"    style="margin-top:8px;font-size:13px;color:#334155;"></p>
+      <p id="last-updated"  style="margin-top:4px;font-size:11px;color:#1e293b;display:none;"></p>
+    </div>
+
+    <!-- Stats -->
+    <div id="stats-row" style="display:none;gap:12px;margin-bottom:24px;" class="flex">
+      <div class="stat-pill"><span id="stat-total" style="font-size:22px;font-weight:800;color:#fff;">0</span><span style="font-size:11px;color:#475569;text-align:center;">Matches Today</span></div>
+      <div class="stat-pill"><span id="stat-home"  style="font-size:22px;font-weight:800;color:#fff;">0</span><span style="font-size:11px;color:#475569;text-align:center;">Home Favoured</span></div>
+      <div class="stat-pill"><span id="stat-away"  style="font-size:22px;font-weight:800;color:#fff;">0</span><span style="font-size:11px;color:#475569;text-align:center;">Away Favoured</span></div>
+    </div>
+
+    <!-- Filters -->
+    <div id="filters-row" style="display:none;gap:8px;margin-bottom:24px;" class="flex">
+      <button class="filter-btn active" data-filter="ALL"  onclick="setFilter('ALL')">All</button>
+      <button class="filter-btn"        data-filter="HOME" onclick="setFilter('HOME')">Home</button>
+      <button class="filter-btn"        data-filter="AWAY" onclick="setFilter('AWAY')">Away</button>
+      <button class="refresh-btn" onclick="fetchPredictions()">↻ Refresh</button>
+    </div>
+
+    <!-- Cards -->
+    <div id="cards" style="display:flex;flex-direction:column;gap:16px;"></div>
+
+  </div>
+
+<script>
+  // ── Config — replace with your new API key after revoking the old one ──────
+  const API_KEY ='c1a97fafab9e4a8cb65985e2685a64fa';
+
+  // ── Cache (mirrors your backend CACHE_TTL of 1hr) ─────────────────────────
+  const CACHE_TTL = 60 * 60 * 1000;
+  let cachedPredictions = null;
+  let lastFetched = null;
+
+  // ── Team color from name hash ──────────────────────────────────────────────
+  function getTeamColor(name) {
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    const hue = Math.abs(hash) % 360;
+    const sat = 55 + (Math.abs(hash >> 8)  % 25);
+    const lit = 48 + (Math.abs(hash >> 16) % 14);
+    return `hsl(${hue},${sat}%,${lit}%)`;
+  }
+  function getTeamColorAlpha(name, alpha) {
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    return `hsla(${Math.abs(hash) % 360},55%,55%,${alpha})`;
+  }
+
+  // ── Team initials ─────────────────────────────────────────────────────────
+  const SKIP = new Set(['FC','CF','SC','AC','AS','SS','US','FK','SK','BV','VfL','VfB','TSG','RB','1.','de','of','the','&']);
+  function getInitials(name) {
+    const parts = name.split(/\s+/).filter(w => !SKIP.has(w));
+    return parts.slice(0,2).map(w => w[0]).join('') || name.slice(0,2).toUpperCase();
+  }
+
+  // ── Prediction logic (ported from football.ts) ────────────────────────────
+  function calcFormPoints(matches) {
+    return matches.reduce((sum, m) => {
+      if (m.result === 'W') return sum + 3;
+      if (m.result === 'D') return sum + 1;
+      return sum;
+    }, 0);
+  }
+
+  function calcGoalsDiff(matches) {
+    return matches.reduce((sum, m) => sum + (m.goalsFor - m.goalsAgainst), 0);
+  }
+
+  function calculateProbabilities(homeTeamName, awayTeamName, homeMatches, awayMatches) {
+    if (!homeMatches.length || !awayMatches.length) return null;
+
+    const homeRaw = Math.max(0, calcFormPoints(homeMatches) * 0.6 + calcGoalsDiff(homeMatches) * 0.4);
+    const awayRaw = Math.max(0, calcFormPoints(awayMatches) * 0.6 + calcGoalsDiff(awayMatches) * 0.4);
+    const total   = homeRaw + awayRaw;
+
+    if (total === 0) return { teams: { homeTeamName, awayTeamName }, homeProb: 50, awayProb: 50, predictedWinner: 'Home Team' };
+
+    const homeProb = Math.round((homeRaw / total) * 100);
+    const awayProb = 100 - homeProb;
+
+    return {
+      teams: { homeTeamName, awayTeamName },
+      homeProb,
+      awayProb,
+      predictedWinner: homeProb >= awayProb ? 'Home Team' : 'Away Team',
+    };
+  }
+
+  function parseTeamForm(matches, teamId) {
+    return matches.map(match => {
+      const isHome    = match.homeTeam.id === teamId;
+      const goalsFor  = isHome ? (match.score.fullTime.home ?? 0) : (match.score.fullTime.away ?? 0);
+      const goalsAgainst = isHome ? (match.score.fullTime.away ?? 0) : (match.score.fullTime.home ?? 0);
+
+      let result = 'D';
+      if (match.score.winner === 'DRAW') result = 'D';
+      else if ((match.score.winner === 'HOME_TEAM' && isHome) || (match.score.winner === 'AWAY_TEAM' && !isHome)) result = 'W';
+      else result = 'L';
+
+      return { result, goalsFor, goalsAgainst };
+    });
+  }
+
+  async function getLastFiveMatches(teamId) {
+    try {
+      const res = await fetch(
+        `https://api.football-data.org/v4/teams/${teamId}/matches?status=FINISHED&limit=5`,
+        { headers: { 'X-Auth-Token': API_KEY } }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error('Failed');
+      return parseTeamForm(data.matches, teamId);
+    } catch (e) {
+      console.error('Error fetching team matches:', e);
+      return null;
+    }
+  }
+
+  async function getPredictions() {
+    const now = Date.now();
+    if (cachedPredictions && lastFetched && now - lastFetched < CACHE_TTL) {
+      console.log('Returning cached predictions');
+      return cachedPredictions;
+    }
+
+    const res = await fetch('https://api.football-data.org/v4/matches', {
+      headers: { 'X-Auth-Token': API_KEY }
+    });
+    if (!res.ok) throw new Error('Failed to fetch matches');
+    const data = await res.json();
+
+    const predictions = [];
+    for (const match of data.matches) {
+      const [homeMatches, awayMatches] = await Promise.all([
+        getLastFiveMatches(match.homeTeam.id),
+        getLastFiveMatches(match.awayTeam.id),
+      ]);
+      if (!homeMatches || !awayMatches) continue;
+
+      const prediction = calculateProbabilities(
+        match.homeTeam.name,
+        match.awayTeam.name,
+        homeMatches,
+        awayMatches
+      );
+      if (prediction) predictions.push(prediction);
+    }
+
+    cachedPredictions = predictions;
+    lastFetched = now;
+    return predictions;
+  }
+
+  // ── UI State ──────────────────────────────────────────────────────────────
+  let allPredictions = [];
+  let currentFilter  = 'ALL';
+
+  document.getElementById('today-date').textContent = new Date().toLocaleDateString('en-GB', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+  });
+
+  function setFilter(f) {
+    currentFilter = f;
+    document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.filter === f));
+    renderCards();
+  }
+
+  // ── Skeleton ──────────────────────────────────────────────────────────────
+  function renderSkeletons(n = 6) {
+    document.getElementById('cards').innerHTML = Array.from({length: n}).map(() => `
+      <div class="match-card skeleton">
+        <div style="height:2px;background:rgba(255,255,255,0.04);"></div>
+        <div style="padding:20px;display:flex;flex-direction:column;gap:16px;">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div style="display:flex;gap:10px;align-items:center;flex:1;">
+              <div style="width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,0.06);"></div>
+              <div style="height:14px;flex:1;border-radius:6px;background:rgba(255,255,255,0.06);"></div>
+            </div>
+            <div style="width:24px;height:14px;border-radius:4px;background:rgba(255,255,255,0.03);"></div>
+            <div style="display:flex;gap:10px;align-items:center;flex:1;justify-content:flex-end;">
+              <div style="height:14px;flex:1;border-radius:6px;background:rgba(255,255,255,0.06);"></div>
+              <div style="width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,0.06);"></div>
+            </div>
+          </div>
+          <div style="height:6px;border-radius:9999px;background:rgba(255,255,255,0.06);"></div>
+          <div style="height:10px;width:55%;border-radius:6px;background:rgba(255,255,255,0.04);"></div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // ── Error ─────────────────────────────────────────────────────────────────
+  function renderError() {
+    document.getElementById('cards').innerHTML = `
+      <div style="display:flex;flex-direction:column;align-items:center;padding:80px 0;gap:16px;text-align:center;">
+        <div style="font-size:40px;">⚠️</div>
+        <p style="font-weight:700;color:#fff;margin:0;">Could not load predictions</p>
+        <p style="font-size:13px;color:#475569;margin:0;">Check your API key or network connection.</p>
+        <button onclick="fetchPredictions()" style="margin-top:8px;padding:8px 20px;border-radius:9999px;font-size:13px;font-weight:700;background:#22c55e;color:#060c18;border:none;cursor:pointer;">↻ Retry</button>
+      </div>
+    `;
+  }
+
+  // ── Card ──────────────────────────────────────────────────────────────────
+  function buildCard(p, index) {
+    const { teams, homeProb, awayProb, predictedWinner } = p;
+    const homeColor   = getTeamColor(teams.homeTeamName);
+    const awayColor   = getTeamColor(teams.awayTeamName);
+    const homeWins    = predictedWinner === 'Home Team';
+    const winnerName  = homeWins ? teams.homeTeamName : teams.awayTeamName;
+    const winnerColor = homeWins ? homeColor : awayColor;
+    const confidence  = Math.max(homeProb, awayProb);
+    const homeBg      = getTeamColorAlpha(teams.homeTeamName, 0.14);
+    const homeBorder  = getTeamColorAlpha(teams.homeTeamName, 0.28);
+    const awayBg      = getTeamColorAlpha(teams.awayTeamName, 0.14);
+    const awayBorder  = getTeamColorAlpha(teams.awayTeamName, 0.28);
+    const winBg       = getTeamColorAlpha(winnerName, 0.12);
+ 
+    return `
+      <div class="match-card card-enter" style="animation-delay:${index * 70}ms;">
+        <div style="height:2px;background:linear-gradient(90deg,${homeColor} 0%,${homeColor}44 45%,${awayColor}44 55%,${awayColor} 100%);"></div>
+        <div style="padding:20px;display:flex;flex-direction:column;gap:16px;">
+
+          <div style="display:flex;align-items:center;gap:12px;">
+            <!-- Home -->
+            <div style="flex:1;display:flex;align-items:center;gap:10px;min-width:0;">
+              <div style="width:32px;height:32px;border-radius:8px;background:${homeBg};border:1px solid ${homeBorder};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <span style="font-size:10px;font-weight:800;color:${homeColor};">${getInitials(teams.homeTeamName)}</span>
+              </div>
+              <div style="min-width:0;">
+                <div style="font-weight:700;color:#fff;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${teams.homeTeamName}</div>
+                <div style="font-size:11px;color:#475569;">Home</div>
+              </div>
+            </div>
+
+            <div style="font-size:11px;font-weight:800;color:#1e3a5f;flex-shrink:0;">VS</div>
+
+            <!-- Away -->
+            <div style="flex:1;display:flex;align-items:center;gap:10px;justify-content:flex-end;min-width:0;">
+              <div style="min-width:0;text-align:right;">
+                <div style="font-weight:700;color:#fff;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${teams.awayTeamName}</div>
+                <div style="font-size:11px;color:#475569;">Away</div>
+              </div>
+              <div style="width:32px;height:32px;border-radius:8px;background:${awayBg};border:1px solid ${awayBorder};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <span style="font-size:10px;font-weight:800;color:${awayColor};">${getInitials(teams.awayTeamName)}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bar -->
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <span style="font-size:11px;font-weight:700;color:${homeColor};">${homeProb}%</span>
+              <span style="font-size:11px;color:#334155;">win probability</span>
+              <span style="font-size:11px;font-weight:700;color:${awayColor};">${awayProb}%</span>
+            </div>
+            <div style="height:6px;border-radius:9999px;overflow:hidden;background:#0a1628;display:flex;">
+              <div class="bar-fill" style="height:100%;border-radius:9999px 0 0 9999px;background:${homeColor};width:${homeProb}%;"></div>
+              <div style="height:100%;border-radius:0 9999px 9999px 0;background:${awayColor};flex:1;"></div>
+            </div>
+          </div>
+
+          <!-- Footer -->
+          <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(255,255,255,0.04);padding-top:10px;">
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="color:#22c55e;font-size:11px;">✦</span>
+              <span style="font-size:12px;font-weight:600;color:${winnerColor};">${winnerName}</span>
+              <span style="font-size:12px;color:#334155;">predicted to win</span>
+            </div>
+            <span style="font-size:11px;font-weight:700;padding:2px 10px;border-radius:9999px;background:${winBg};color:${winnerColor};">${confidence}%</span>
+          </div>
+
+        </div>
+      </div>
+    `;
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────────
+  function renderCards() {
+    const filtered = allPredictions.filter(p => {
+      if (currentFilter === 'HOME') return p.predictedWinner === 'Home Team';
+      if (currentFilter === 'AWAY') return p.predictedWinner === 'Away Team';
+      return true;
+    });
+
+    if (!filtered.length) {
+      document.getElementById('cards').innerHTML = `
+        <div style="text-align:center;padding:80px 0;">
+          <p style="font-size:18px;font-weight:700;color:#fff;margin:0 0 8px;">No matches today</p>
+          <p style="font-size:13px;color:#475569;margin:0;">Check back later or try refreshing.</p>
+        </div>
+      `;
+      return;
+    }
+    document.getElementById('cards').innerHTML = filtered.map((p, i) => buildCard(p, i)).join('');
+  }
+
+  // ── Fetch ─────────────────────────────────────────────────────────────────
+  async function fetchPredictions() {
+    document.getElementById('stats-row').style.display   = 'none';
+    document.getElementById('filters-row').style.display = 'none';
+    renderSkeletons();
+
+    try {
+      allPredictions = await getPredictions();
+
+      const homeWins = allPredictions.filter(p => p.predictedWinner === 'Home Team').length;
+      const awayWins = allPredictions.filter(p => p.predictedWinner === 'Away Team').length;
+      document.getElementById('stat-total').textContent = allPredictions.length;
+      document.getElementById('stat-home').textContent  = homeWins;
+      document.getElementById('stat-away').textContent  = awayWins;
+      document.getElementById('stats-row').style.display   = 'flex';
+      document.getElementById('filters-row').style.display = 'flex';
+
+      const lu = document.getElementById('last-updated');
+      lu.textContent  = `Fetched at ${new Date().toLocaleTimeString()} · Cached for 1hr`;
+      lu.style.display = 'block';
+
+      renderCards();
+    } catch (err) {
+      console.error('Failed:', err);
+      renderError();
+    }
+  }
+
+  fetchPredictions();
+</script>
+</body>
+</html>
