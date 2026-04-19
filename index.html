@@ -68,26 +68,19 @@
   </div>
 
 <script>
-  // Only UI helpers (NO API / backend logic)
+  async function fetchPredictions() {
+  try {
+    const res = await fetch('/api/predictions');
+    const data = await res.json();
 
-  document.getElementById('today-date').textContent =
-    new Date().toLocaleDateString('en-GB', {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric'
-    });
+    console.log(data); // 👈 FIRST: confirm data is coming
 
-  // Optional: show skeleton loading UI (pure UI)
-  function renderSkeletons(n = 5) {
-    const container = document.getElementById('cards');
-    container.innerHTML = Array.from({length: n}).map(() => `
-      <div class="skeleton" style="height:120px;border-radius:16px;background:rgba(255,255,255,0.04);"></div>
-    `).join('');
+  } catch (err) {
+    console.error(err);
   }
+}
 
-  // Show skeletons initially (until backend fills real data)
-  renderSkeletons();
+fetchPredictions();
 </script>
 
 </body>
