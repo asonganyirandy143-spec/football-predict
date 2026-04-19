@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Match Predictor</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; }
+    body { background: #060c18; font-family: 'DM Sans', sans-serif; min-height: 100vh; }
+    .grid-bg {
+      background-image:
+        linear-gradient(rgba(255,255,255,0.012) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.012) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+    .solid  { font-family: 'Bebas Neue', sans-serif; color: #fff; }
+    .outline { font-family: 'Bebas Neue', sans-serif; -webkit-text-stroke: 1.5px rgba(255,255,255,0.2); color: transparent; }
+    @keyframes ping    { 75%,100%{ transform:scale(2); opacity:0; } }
+    @keyframes pulse   { 0%,100%{ opacity:1; } 50%{ opacity:0.4; } }
+    .ping        { animation: ping 1.4s cubic-bezier(0,0,0.2,1) infinite; }
+    .skeleton    { animation: pulse 1.6s ease-in-out infinite; }
+    .filter-btn  { padding:6px 16px; border-radius:9999px; font-size:11px; font-weight:700; letter-spacing:0.15em; text-transform:uppercase; border:1px solid rgba(255,255,255,0.07); background:rgba(255,255,255,0.04); color:#475569; cursor:pointer; transition:all 0.2s; }
+    .filter-btn.active { background:#fff; color:#060c18; border-color:#fff; }
+    .refresh-btn { padding:6px 16px; border-radius:9999px; font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; border:1px solid rgba(34,197,94,0.25); background:rgba(34,197,94,0.08); color:#22c55e; cursor:pointer; margin-left:auto; }
+    .stat-pill   { flex:1; display:flex; flex-direction:column; align-items:center; padding:10px 12px; border-radius:12px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.05); }
+  </style>
+</head>
+<body class="grid-bg">
+
+  <div class="relative max-w-2xl mx-auto px-4 py-10">
+
+    <!-- Header -->
+    <div style="margin-bottom:32px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+        <span style="position:relative;display:inline-flex;width:8px;height:8px;">
+          <span class="ping" style="position:absolute;inset:0;border-radius:9999px;background:#22c55e;opacity:0.75;"></span>
+          <span style="position:relative;width:8px;height:8px;border-radius:9999px;background:#22c55e;display:inline-flex;"></span>
+        </span>
+        <span style="font-size:11px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:#22c55e;">Today's Predictions</span>
+      </div>
+      <h1 style="line-height:1;margin:0;">
+        <span class="solid"   style="font-size:56px;display:block;">Match</span>
+        <span class="outline" style="font-size:56px;display:block;">Predictor</span>
+      </h1>
+      <p id="today-date" style="margin-top:8px;font-size:13px;color:#334155;"></p>
+    </div>
+
+    <!-- Stats -->
+    <div id="stats-row" style="display:flex;gap:12px;margin-bottom:24px;">
+      <div class="stat-pill"><span id="stat-total" style="font-size:22px;font-weight:800;color:#fff;">0</span><span style="font-size:11px;color:#475569;">Matches Today</span></div>
+      <div class="stat-pill"><span id="stat-home"  style="font-size:22px;font-weight:800;color:#fff;">0</span><span style="font-size:11px;color:#475569;">Home Favoured</span></div>
+      <div class="stat-pill"><span id="stat-away"  style="font-size:22px;font-weight:800;color:#fff;">0</span><span style="font-size:11px;color:#475569;">Away Favoured</span></div>
+    </div>
+
+    <!-- Filters -->
+    <div style="display:flex;gap:8px;margin-bottom:24px;">
+      <button class="filter-btn active">All</button>
+      <button class="filter-btn">Home</button>
+      <button class="filter-btn">Away</button>
+      <button class="refresh-btn">↻ Refresh</button>
+    </div>
+
+    <!-- Cards (EMPTY – JS WILL FILL) -->
+    <div id="cards" style="display:flex;flex-direction:column;gap:16px;"></div>
+
+  </div>
+
+<script>
+  // Only UI helpers (NO API / backend logic)
+
+  document.getElementById('today-date').textContent =
+    new Date().toLocaleDateString('en-GB', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+
+  // Optional: show skeleton loading UI (pure UI)
+  function renderSkeletons(n = 5) {
+    const container = document.getElementById('cards');
+    container.innerHTML = Array.from({length: n}).map(() => `
+      <div class="skeleton" style="height:120px;border-radius:16px;background:rgba(255,255,255,0.04);"></div>
+    `).join('');
+  }
+
+  // Show skeletons initially (until backend fills real data)
+  renderSkeletons();
+</script>
+
+</body>
+</html>
